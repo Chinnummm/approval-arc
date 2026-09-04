@@ -87,7 +87,7 @@ export function roleHome(role?: string): string {
     case "admin":
       return "/admin/dashboard";
     default:
-      return "/auth";
+      return "/auth/applicant";
   }
 }
 
@@ -110,7 +110,7 @@ export function RequireRole({
   }
   if (!isAuthenticated) {
     const returnTo = `${location.pathname}${location.search}`;
-    return <Navigate to={`/auth?returnTo=${encodeURIComponent(returnTo)}`} replace />;
+    return <Navigate to={`/auth/applicant?returnTo=${encodeURIComponent(returnTo)}`} replace />;
   }
   if (!user?.role || !roles.includes(user.role as Role)) {
     return <Navigate to={roleHome(user?.role)} replace />;

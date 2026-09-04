@@ -20,7 +20,7 @@ export default function ApprovalJourneyPage() {
   const profileSector = data?.profile?.sector;
   const ruleDocs = useQuery(
     api.organizations.rulesForProfile,
-    profileState && profileSector ? { state: profileState, sector: profileSector } : undefined,
+    profileState && profileSector ? { state: profileState, sector: profileSector } : "skip",
   );
 
   const combined = useMemo(() => {

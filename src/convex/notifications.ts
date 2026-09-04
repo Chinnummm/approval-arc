@@ -51,24 +51,23 @@ export const listAudit = query({
     if (user.role === ROLES.APPLICANT) {
       const all = await ctx.db.query("auditLogs").order("desc").take(300);
       const org = user.organizationId ? await ctx.db.get(user.organizationId) : null;
-      const orgId = org?._id;
-      const mine = all.filter(
-        (e) =>
-          e.entityType === "applications" ||
-          e.entityType === "documents" ||
-          e.entityType === "queries" ||
-          e.entityType === "inspections" ||
-          e.entityType === "complianceObligations",
-      );
       const relevant: string[] = [];
-      const appIdsByOrg = await ctx.db
-        .query("applications")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId ?? "none"))
-        .collect();
-      for (const a of appIdsByOrg) relevant.push(a._id);
-      return mine
-        .filter((e) => !e.entityId || relevant.includes(e.entityId))
-        .slice(0, args.limit ?? 100);
+      if (org) {
+        const appIdsByOrg = await ctx.db
+          .query("applications")
+          .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
+          .collect();
+        for (const a of appIdsByOrg) relevant.push(a._id);
+      }
+      const relevantSet = new Set(relevant);
+      const mine = all.filter((e) => {
+        if (["applications", "documents", "queries", "inspections", "complianceObligations"].includes(e.entityType)) {
+          return !e.entityId || relevantSet.has(e.entityId);
+        }
+        // login / profile events for this user or their organization
+        return e.actorId === user._id || e.entityId === user._id;
+      });
+      return mine.slice(0, args.limit ?? 100);
     }
     let all = await ctx.db.query("auditLogs").order("desc").collect();
     if (args.actorId) all = all.filter((e) => e.actorId === args.actorId);

@@ -4,8 +4,8 @@
 // number is derived from the configured working calendar.
 // ---------------------------------------------------------------------------
 import { Doc } from "../_generated/dataModel";
-import { MutationCtx, QueryCtx } from "../_generated/server";
 import { AppStatus, SlaStatus } from "../schema";
+import { ReaderCtx, WriterCtx } from "./authz";
 
 export const PAUSE_STATES: AppStatus[] = ["QUERY_RAISED", "WAITING_FOR_APPLICANT"];
 
@@ -77,7 +77,7 @@ const DEFAULT_CAL: Omit<Doc<"workingCalendars">, "_id" | "_creationTime"> = {
 };
 
 export async function getWorkingCalendar(
-  ctx: QueryCtx | MutationCtx,
+  ctx: ReaderCtx | WriterCtx,
   state: string,
 ): Promise<Doc<"workingCalendars">> {
   const cal = await ctx.db
@@ -127,7 +127,7 @@ function intervalWaitWorkingDays(
  * department through reassignment, not by stopping the clock.
  */
 export async function computeSla(
-  ctx: QueryCtx | MutationCtx,
+  ctx: ReaderCtx | WriterCtx,
   app: Doc<"applications">,
   orgState: string,
 ): Promise<SlaResult> {

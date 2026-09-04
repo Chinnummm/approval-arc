@@ -8,6 +8,7 @@ import {
   ApprovalError,
   insertApplicationEvent,
   notify,
+  ReaderCtx,
   recordAudit,
   requireRole,
   requireUser,
@@ -17,6 +18,7 @@ import { computeSla, getWorkingCalendar } from "./lib/workdays";
 import { computeReadiness } from "./lib/readiness";
 import { evaluateRule } from "./lib/engine";
 import { toProfileLike } from "./organizations";
+import { generateComplianceForApprovedApp } from "./compliance";
 import { AppStatus, ROLES } from "./schema";
 
 export type TransitionOpts = {
@@ -60,7 +62,7 @@ export function departmentFor(rule: Doc<"regulatoryRules">): string {
   return "Industries & Commerce";
 }
 
-async function getActiveRule(ctx: WriterCtx, ruleId: string): Promise<Doc<"regulatoryRules">> {
+async function getActiveRule(ctx: ReaderCtx, ruleId: string): Promise<Doc<"regulatoryRules">> {
   const rules = await ctx.db.query("regulatoryRules").collect();
   const versions = rules.filter((r) => r.ruleId === ruleId && r.verificationStatus === "ACTIVE");
   if (versions.length === 0) throw new ApprovalError(`No active verified rule for ${ruleId}.`, "NO_RULE");
@@ -69,7 +71,7 @@ async function getActiveRule(ctx: WriterCtx, ruleId: string): Promise<Doc<"regul
 }
 
 async function getOrgProfile(
-  ctx: WriterCtx,
+  ctx: ReaderCtx,
   orgId: Id<"organizations">,
 ): Promise<{ profile: Doc<"businessProfiles">; org: Doc<"organizations"> }> {
   const profile = await ctx.db
@@ -383,6 +385,15 @@ export const decideApplication = mutation({
       decisionAt: now,
       decisionBy: user._id,
     } as never);
+
+    // On approval, generate post-approval compliance obligations from the rule.
+    if (args.decision === "APPROVED") {
+      const rule = await getActiveRule(ctx, app.ruleId).catch(() => null);
+      if (rule) {
+        await generateComplianceForApprovedApp(ctx, app, rule, now);
+      }
+    }
+
     // Gateway sync
     const sub = await ctx.db
       .query("governmentSubmissions")

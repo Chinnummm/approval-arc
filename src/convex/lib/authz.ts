@@ -3,13 +3,8 @@
 // append-only and immutable from the application UI.
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
-import type {
-  Auth,
-  GenericDataModel,
-  GenericDatabaseReader,
-  GenericDatabaseWriter,
-} from "convex/server";
-import { Doc, Id } from "../_generated/dataModel";
+import type { Auth, GenericDatabaseReader, GenericDatabaseWriter } from "convex/server";
+import { DataModel, Doc, Id } from "../_generated/dataModel";
 import { Role, ROLES } from "../schema";
 
 export class ApprovalError extends ConvexError<{ message: string; code?: string }> {
@@ -19,11 +14,11 @@ export class ApprovalError extends ConvexError<{ message: string; code?: string 
 }
 
 export type ReaderCtx = {
-  db: GenericDatabaseReader<GenericDataModel>;
+  db: GenericDatabaseReader<DataModel>;
   auth: Auth;
 };
 export type WriterCtx = {
-  db: GenericDatabaseWriter<GenericDataModel>;
+  db: GenericDatabaseWriter<DataModel>;
   auth: Auth;
 };
 

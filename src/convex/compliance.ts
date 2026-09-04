@@ -1,10 +1,9 @@
 // Compliance engine: after a rule-based approval, configured post-approval
 // obligations are generated from the rule (never invented at runtime).
 import { v } from "convex/values";
-import type { GenericDataModel, GenericDatabaseWriter } from "convex/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { mutation, MutationCtx, query, QueryCtx } from "./_generated/server";
-import { ApprovalError, notify, recordAudit, requireUser } from "./lib/authz";
+import { ApprovalError, recordAudit, requireUser } from "./lib/authz";
 import { ROLES } from "./schema";
 
 /**
@@ -12,7 +11,7 @@ import { ROLES } from "./schema";
  * Idempotent: re-running never duplicates existing obligations.
  */
 export async function generateComplianceForApprovedApp(
-  ctx: { db: GenericDatabaseWriter<GenericDataModel> },
+  ctx: { db: MutationCtx["db"] },
   app: Doc<"applications">,
   rule: Doc<"regulatoryRules">,
   approvalAt: number,

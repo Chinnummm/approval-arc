@@ -281,3 +281,15 @@ export const getRuleAt = query({
 });
 
 export const normalizeName = normalize;
+
+/** ACTIVE rules matching a state + sector (for the journey dependency graph). */
+export const rulesForProfile = query({
+  args: { state: v.string(), sector: v.string() },
+  handler: async (ctx: QueryCtx, args) => {
+    await requireUser(ctx);
+    const rules = await ctx.db.query("regulatoryRules").collect();
+    return rules.filter(
+      (r) => r.verificationStatus === "ACTIVE" && r.state === args.state && r.sector === args.sector,
+    );
+  },
+});

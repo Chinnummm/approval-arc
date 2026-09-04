@@ -21,5 +21,3 @@ export async function assertDeptLocal(
   if (user.department && app.department !== user.department)
     throw new ApprovalError("This application belongs to another department compartment.", "FORBIDDEN");
 }
-
-export { ROLES };

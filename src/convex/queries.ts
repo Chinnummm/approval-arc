@@ -10,7 +10,8 @@ import {
   recordAudit,
   requireRole,
 } from "./lib/authz";
-import { applyStatusChange, assertDeptLocal } from "./lib/application-core";
+import { assertDeptLocal } from "./lib/applicationCore";
+import { applyStatusChange } from "./applications";
 import { ROLES } from "./schema";
 
 export const raiseQuery = mutation({

@@ -1,304 +1,267 @@
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
-
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import logo from "@/assets/logo.svg";
-import { ArrowRight, Loader2, Mail, UserX } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { roleHome } from "@/components/app/AppShell";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import { ArrowRight, Building2, Loader2, PanelLeft, ShieldCheck, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-interface AuthProps {
-  redirectAfterAuth?: string;
+type Mode = "applicant" | "department";
+
+const DEMO: Record<Mode, { label: string; email: string; hint: string }[]> = {
+  applicant: [
+    {
+      label: "Demo applicant account",
+      email: "demo.applicant@approvalarc.in",
+      hint: "GreenHarvest Foods Pvt. Ltd. — business profile, applications, documents and journey pre-loaded.",
+    },
+  ],
+  department: [
+    {
+      label: "Demo officer account",
+      email: "demo.officer@mpcb.in",
+      hint: "Maharashtra Pollution Control Board — officer queue, queries and inspections.",
+    },
+    {
+      label: "Demo supervisor account",
+      email: "demo.supervisor@mpcb.in",
+      hint: "MPCB supervisor — can move applications to decision and approve/reject.",
+    },
+    {
+      label: "Demo administrator account",
+      email: "demo.admin@approvalarc.in",
+      hint: "System administrator — regulatory rule lifecycle, users & roles, audit log.",
+    },
+  ],
+};
+
+function readError(e: unknown): string {
+  const err = e as { message?: string; data?: { message?: string } };
+  return err?.data?.message ?? err?.message ?? "Sign-in failed. Please try again.";
 }
 
-function resolveRedirectAfterAuth(
-  returnTo: string | null,
-  fallback = "/dashboard",
-) {
-  if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
-    return returnTo;
-  }
-  return fallback;
-}
-
-function Auth({ redirectAfterAuth }: AuthProps = {}) {
-  const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+function AuthView({ mode }: { mode: Mode }) {
+  const { isLoading, isAuthenticated, user, signIn } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const redirect = resolveRedirectAfterAuth(
-    searchParams.get("returnTo"),
-    redirectAfterAuth,
-  );
-  const [step, setStep] = useState<"signIn" | { email: string }>("signIn");
-  const [otp, setOtp] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const returnTo = searchParams.get("returnTo");
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      navigate(redirect);
+    if (isLoading || !isAuthenticated) return;
+    if (user?.role) {
+      if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
+        navigate(returnTo);
+      } else {
+        navigate(roleHome(user.role));
+      }
     }
-  }, [authLoading, isAuthenticated, navigate, redirect]);
-  const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsLoading(true);
+  }, [isLoading, isAuthenticated, user, navigate, returnTo]);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setError(null);
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    if (!email || !password) {
+      setError("Enter your email and password.");
+      return;
+    }
+    setBusy("signin");
     try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string });
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Email sign-in error:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to send verification code. Please try again.",
-      );
-      setIsLoading(false);
+      await signIn("password", { email, password, flow: "signIn" });
+    } catch (err) {
+      setError(readError(err));
+      setBusy(null);
     }
   };
 
-  const handleOtpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsLoading(true);
+  const demo = async (email: string) => {
     setError(null);
+    setBusy(email);
     try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-
-      console.log("signed in");
-
-      navigate(redirect);
-    } catch (error) {
-      console.error("OTP verification error:", error);
-
-      setError("The verification code you entered is incorrect.");
-      setIsLoading(false);
-
-      setOtp("");
+      await signIn("password", { email, password: "DemoPass@2026", flow: "signIn" });
+    } catch (err) {
+      setError(readError(err));
+      setBusy(null);
     }
   };
 
-  const handleGuestLogin = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      console.log("Attempting anonymous sign in...");
-      await signIn("anonymous");
-      console.log("Anonymous sign in successful");
-      navigate(redirect);
-    } catch (error) {
-      console.error("Guest login error:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
-      setError(`Failed to sign in as guest: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setIsLoading(false);
-    }
-  };
+  const applicant = mode === "applicant";
 
   return (
-    <div className="min-h-screen flex flex-col">
-
-      
-      {/* Auth Content */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center justify-center h-full flex-col">
-        <Card className="min-w-[350px] pb-0 border shadow-md">
-          {step === "signIn" ? (
-            <>
-              <CardHeader className="text-center">
-              <div className="flex justify-center">
-                    <img
-                      src={logo}
-                      alt="Lock Icon"
-                      width={64}
-                      height={64}
-                      className="rounded-lg mb-4 mt-4 cursor-pointer"
-                      onClick={() => navigate("/")}
-                    />
-                  </div>
-                <CardTitle className="text-xl">Get Started</CardTitle>
-                <CardDescription>
-                  Enter your email to log in or sign up
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleEmailSubmit}>
-                <CardContent>
-                  
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        name="email"
-                        placeholder="name@example.com"
-                        type="email"
-                        className="pl-9"
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="icon"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {error && (
-                    <p className="mt-2 text-sm text-red-500">{error}</p>
-                  )}
-                  
-                  <div className="mt-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-4"
-                      onClick={handleGuestLogin}
-                      disabled={isLoading}
-                    >
-                      <UserX className="mr-2 h-4 w-4" />
-                      Continue as Guest
-                    </Button>
-                  </div>
-                </CardContent>
-              </form>
-            </>
-          ) : (
-            <>
-              <CardHeader className="text-center mt-4">
-                <CardTitle>Check your email</CardTitle>
-                <CardDescription>
-                  We've sent a code to {step.email}
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleOtpSubmit}>
-                <CardContent className="pb-4">
-                  <input type="hidden" name="email" value={step.email} />
-                  <input type="hidden" name="code" value={otp} />
-
-                  <div className="flex justify-center">
-                    <InputOTP
-                      value={otp}
-                      onChange={setOtp}
-                      maxLength={6}
-                      disabled={isLoading}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && otp.length === 6 && !isLoading) {
-                          // Find the closest form and submit it
-                          const form = (e.target as HTMLElement).closest("form");
-                          if (form) {
-                            form.requestSubmit();
-                          }
-                        }
-                      }}
-                    >
-                      <InputOTPGroup>
-                        {Array.from({ length: 6 }).map((_, index) => (
-                          <InputOTPSlot key={index} index={index} />
-                        ))}
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  {error && (
-                    <p className="mt-2 text-sm text-red-500 text-center">
-                      {error}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground text-center mt-4">
-                    Didn't receive a code?{" "}
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto"
-                      onClick={() => setStep("signIn")}
-                    >
-                      Try again
-                    </Button>
-                  </p>
-                </CardContent>
-                <CardFooter className="flex-col gap-2">
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading || otp.length !== 6}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        Verify code
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setStep("signIn")}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    Use different email
-                  </Button>
-                </CardFooter>
-              </form>
-            </>
-          )}
-
-          <div className="py-4 px-6 text-xs text-center text-muted-foreground bg-muted border-t rounded-b-lg">
-            Secured by{" "}
-            <a
-              href="https://freebuff.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-primary transition-colors"
-            >
-              freebuff.com
-            </a>
+    <div className="flex min-h-screen bg-background">
+      {/* Left brand panel */}
+      <div className="hidden w-[46%] flex-col justify-between border-r bg-neutral-950 p-10 text-white lg:flex">
+        <Link to="/" className="flex items-center gap-2.5">
+          <span className="flex size-7 items-center justify-center rounded-[5px] bg-white text-neutral-900">
+            <PanelLeft className="size-4" />
+          </span>
+          <span className="text-[15px] font-semibold tracking-tight">ApprovalArc</span>
+        </Link>
+        <div>
+          <h1 className="max-w-md text-2xl leading-snug font-semibold tracking-tight">
+            {applicant
+              ? "Turn fragmented industrial approvals into one intelligent journey."
+              : "One console for the approvals that reach your department."}
+          </h1>
+          <p className="mt-4 max-w-md text-[13px] leading-6 text-neutral-400">
+            {applicant
+              ? "Discover requirements, prepare documents, coordinate workflows, track SLAs and stay compliant — with government authorities as the final decision-makers."
+              : "Manage the application queue, raise queries, schedule inspections, monitor SLA in working days and keep an audited trail of every action."}
+          </p>
+          <div className="mt-8 flex items-center gap-2 rounded-sm border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-neutral-300">
+            <Sparkles className="size-3.5" />
+            Deterministic rules · No AI decisions · Authority remains final
           </div>
-        </Card>
+        </div>
+        <p className="text-[11px] text-neutral-500">
+          Prototype for Smart India Hackathon 2026 · SH26130
+        </p>
+      </div>
+
+      {/* Form panel */}
+      <div className="flex flex-1 items-center justify-center px-5 py-12">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex items-center justify-between lg:hidden">
+            <Link to="/" className="flex items-center gap-2">
+              <span className="flex size-7 items-center justify-center rounded-[5px] bg-neutral-900 text-white">
+                <PanelLeft className="size-4" />
+              </span>
+              <span className="text-[15px] font-semibold tracking-tight">ApprovalArc</span>
+            </Link>
+          </div>
+
+          <div className="mb-6 flex size-9 items-center justify-center rounded-md border bg-muted/60">
+            {applicant ? <Building2 className="size-4" /> : <ShieldCheck className="size-4" />}
+          </div>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {applicant ? "Applicant sign in" : "Department sign in"}
+          </h2>
+          <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground">
+            {applicant
+              ? "Sign in to manage your business's approval journey."
+              : "Official sign-in for department officers, supervisors and administrators."}
+          </p>
+
+          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+            {!applicant && (
+              <div className="space-y-1.5">
+                <Label htmlFor="department" className="text-xs text-muted-foreground">
+                  Department
+                </Label>
+                <Input
+                  id="department"
+                  name="department"
+                  defaultValue="Maharashtra Pollution Control Board"
+                  disabled
+                  className="h-9 bg-muted/50 text-[13px]"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Demo configuration — only MPCB demo rules are seeded.
+                </p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs text-muted-foreground">
+                {applicant ? "Email" : "Official email / employee ID"}
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="text"
+                placeholder={applicant ? "name@company.in" : "name@department.gov.in"}
+                autoComplete="username"
+                className="h-9 text-[13px]"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-xs text-muted-foreground">
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                className="h-9 text-[13px]"
+                required
+              />
+            </div>
+            {error && (
+              <p className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+                {error}
+              </p>
+            )}
+            <Button type="submit" disabled={!!busy} className="h-9 w-full">
+              {busy === "signin" ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <ArrowRight className="mr-2 size-4" />
+              )}
+              Sign in
+            </Button>
+          </form>
+
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+              Demo account
+            </span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <div className="space-y-2">
+            {DEMO[mode].map((d) => (
+              <button
+                key={d.email}
+                type="button"
+                disabled={!!busy}
+                onClick={() => void demo(d.email)}
+                className={cn(
+                  "flex w-full items-start justify-between gap-3 rounded-md border px-3 py-2.5 text-left transition-colors",
+                  busy === d.email ? "opacity-60" : "hover:bg-muted/60",
+                )}
+              >
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium">
+                    {busy === d.email && <Loader2 className="size-3.5 animate-spin" />}
+                    {d.label}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
+                    {d.email} · password: DemoPass@2026
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-4 text-muted-foreground/80">
+                    {d.hint}
+                  </span>
+                </span>
+                <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+
+          <p className="mt-6 text-center text-[11px] leading-4 text-muted-foreground">
+            Demo accounts are clearly-labelled prototype credentials — they are not real government
+            accounts.{" "}
+            <Link to={applicant ? "/auth/department" : "/auth/applicant"} className="underline hover:text-foreground">
+              {applicant ? "Department sign in instead" : "Applicant sign in instead"}
+            </Link>
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-export default function AuthPage(props: AuthProps) {
+export default function AuthPage({ mode = "applicant" }: { mode?: Mode }) {
   return (
     <Suspense>
-      <Auth {...props} />
+      <AuthView mode={mode} />
     </Suspense>
   );
 }
